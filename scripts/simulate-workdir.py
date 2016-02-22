@@ -21,8 +21,8 @@ g_nb_src_labels = 0
 g_nb_dst_labels = 0
 
 
-def upd_index(dst_dsearch, doc, new):
-    index_updater = dst_dsearch.get_index_updater(optimize=False)
+def upd_index(dst_dsearch, doc, new, learn):
+    index_updater = dst_dsearch.get_index_updater(optimize=False, learn=learn)
     if new:
         index_updater.add_doc(doc)
     else:
@@ -40,7 +40,7 @@ def label_guess(dst_dsearch, src_doc, dst_doc):
 
     for label in guessed_labels:
         dst_dsearch.add_label(dst_doc, label, update_index=False)
-    upd_index(dst_dsearch, dst_doc, new=True)
+    upd_index(dst_dsearch, dst_doc, new=True, learn=False)
 
 
 def fix_labels(dst_dsearch, src_doc, dst_doc):
@@ -82,7 +82,7 @@ def fix_labels(dst_dsearch, src_doc, dst_doc):
             changed = True
 
     if changed:
-        upd_index(dst_dsearch, dst_doc, new=False)
+        upd_index(dst_dsearch, dst_doc, new=False, learn=True)
 
     if not wrong:
         print ("OK: {} / Missing: {}".format(correct, missing))
@@ -174,7 +174,7 @@ def main():
                     fix_labels(dst_dsearch, src_doc, dst_doc)
                 else:
                     # just update the index
-                    upd_index(dst_dsearch, dst_doc, new=False)
+                    upd_index(dst_dsearch, dst_doc, new=False, learn=False)
 
                 current_doc = docs[0]
 

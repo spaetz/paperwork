@@ -1180,7 +1180,7 @@ class PageDropHandler(Drawer):
 
         drag_context.finish(True, True, time)  # success = True
         self.__main_win.show_page(dst_page, force_refresh=True)
-        self.__main_win.upd_index({src_page.doc, dst_page.doc})
+        self.__main_win.upd_index({src_page.doc, dst_page.doc}, learn=False)
 
     def set_enabled(self, enabled):
         canvas = self.__main_win.img['canvas']

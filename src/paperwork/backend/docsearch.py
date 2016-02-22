@@ -210,11 +210,14 @@ class DocIndexUpdater(GObject.GObject):
     Update the index content.
     Don't forget to call commit() to apply the changes
     """
-    def __init__(self, docsearch, optimize, progress_cb=dummy_progress_cb):
+    def __init__(self, docsearch, optimize, learn,
+                 progress_cb=dummy_progress_cb):
         self.docsearch = docsearch
         self.optimize = optimize
+        self.learn = learn
         self.index_writer = docsearch.index.writer()
-        self.label_guesser_updater = docsearch.label_guesser.get_updater()
+        if learn:
+            self.label_guesser_updater = docsearch.label_guesser.get_updater()
         self.progress_cb = progress_cb
 
     def _update_doc_in_index(self, index_writer, doc):
@@ -268,7 +271,8 @@ class DocIndexUpdater(GObject.GObject):
         """
         logger.info("Indexing new doc: %s" % doc)
         self._update_doc_in_index(self.index_writer, doc)
-        self.label_guesser_updater.add_doc(doc)
+        if self.learn:
+            self.label_guesser_updater.add_doc(doc)
         if doc.docid not in self.docsearch._docs_by_id:
             self.docsearch._docs_by_id[doc.docid] = doc
 
@@ -278,7 +282,8 @@ class DocIndexUpdater(GObject.GObject):
         """
         logger.info("Updating modified doc: %s" % doc)
         self._update_doc_in_index(self.index_writer, doc)
-        self.label_guesser_updater.upd_doc(doc)
+        if self.learn:
+            self.label_guesser_updater.upd_doc(doc)
 
     def del_doc(self, doc):
         """
@@ -293,7 +298,8 @@ class DocIndexUpdater(GObject.GObject):
             self._delete_doc_from_index(self.index_writer, doc)
             return
         self._delete_doc_from_index(self.index_writer, doc.docid)
-        self.label_guesser_updater.del_doc(doc)
+        if self.learn:
+            self.label_guesser_updater.del_doc(doc)
 
     def commit(self):
         """
@@ -302,7 +308,8 @@ class DocIndexUpdater(GObject.GObject):
         logger.info("Index: Commiting changes")
         self.index_writer.commit()
         del self.index_writer
-        self.label_guesser_updater.commit()
+        if self.learn:
+            self.label_guesser_updater.commit()
 
         self.docsearch.reload_searcher()
 
@@ -313,7 +320,8 @@ class DocIndexUpdater(GObject.GObject):
         logger.info("Index: Index update cancelled")
         self.index_writer.cancel()
         del self.index_writer
-        self.label_guesser_updater.cancel()
+        if self.learn:
+            self.label_guesser_updater.cancel()
 
 
 class DocSearch(object):
@@ -448,7 +456,7 @@ class DocSearch(object):
         """
         return DocDirExaminer(self)
 
-    def get_index_updater(self, optimize=True):
+    def get_index_updater(self, optimize=True, learn=False):
         """
         Return an object useful to update the content of the index
 
@@ -457,7 +465,7 @@ class DocSearch(object):
         Some helper methods, with more specific goals, may be available for
         what you want to do.
         """
-        return DocIndexUpdater(self, optimize)
+        return DocIndexUpdater(self, optimize, learn)
 
     def guess_labels(self, doc):
         """
@@ -564,7 +572,7 @@ class DocSearch(object):
 
         Obsolete. To remove. Use get_index_updater() instead
         """
-        updater = self.get_index_updater(optimize=False)
+        updater = self.get_index_updater(optimize=False, learn=False)
         updater.upd_doc(page.doc)
         updater.commit()
         if page.doc.docid not in self._docs_by_id:
@@ -684,7 +692,8 @@ class DocSearch(object):
         final_suggestions.sort()
         return final_suggestions
 
-    def create_label(self, label, doc=None, callback=dummy_progress_cb):
+    def create_label(self, label, doc=None, learn=False,
+                     callback=dummy_progress_cb):
         """
         Create a new label
 
@@ -698,11 +707,11 @@ class DocSearch(object):
         self.label_guesser.load(label.name)
         if doc:
             doc.add_label(label)
-            updater = self.get_index_updater(optimize=False)
+            updater = self.get_index_updater(optimize=False, learn=learn)
             updater.upd_doc(doc)
             updater.commit()
 
-    def add_label(self, doc, label, update_index=True):
+    def add_label(self, doc, label, update_index=True, learn=False):
         """
         Add a label on a document.
 
@@ -714,17 +723,17 @@ class DocSearch(object):
         assert(label in self.labels.values())
         doc.add_label(label)
         if update_index:
-            updater = self.get_index_updater(optimize=False)
+            updater = self.get_index_updater(optimize=False, learn=learn)
             updater.upd_doc(doc)
             updater.commit()
 
-    def remove_label(self, doc, label, update_index=True):
+    def remove_label(self, doc, label, update_index=True, learn=False):
         """
         Remove a label from a doc. Takes care of updating the index
         """
         doc.remove_label(label)
         if update_index:
-            updater = self.get_index_updater(optimize=False)
+            updater = self.get_index_updater(optimize=False, learn=learn)
             updater.upd_doc(doc)
             updater.commit()
 

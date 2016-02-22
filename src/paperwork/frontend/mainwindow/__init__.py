@@ -329,7 +329,7 @@ class JobIndexUpdater(Job):
 
     def __init__(self, factory, id, config, docsearch,
                  new_docs=set(), upd_docs=set(), del_docs=set(),
-                 optimize=True):
+                 optimize=True, learn=False):
         Job.__init__(self, factory, id)
         self.__docsearch = docsearch
         self.__config = config
@@ -343,6 +343,7 @@ class JobIndexUpdater(Job):
         self.update_only = len(new_docs) == 0 and len(del_docs) == 0
 
         self.optimize = optimize
+        self.learn = learn
         self.index_updater = None
         self.total = (len(self.new_docs) + len(self.upd_docs) +
                       len(self.del_docs))
@@ -376,7 +377,7 @@ class JobIndexUpdater(Job):
         if self.index_updater is None:
             self.emit('index-update-start')
             self.index_updater = self.__docsearch.get_index_updater(
-                optimize=self.optimize)
+                optimize=self.optimize, learn=learn)
 
         if not self.can_run:
             self.emit('index-update-interrupted')
@@ -440,10 +441,10 @@ class JobFactoryIndexUpdater(JobFactory):
 
     def make(self, docsearch,
              new_docs=set(), upd_docs=set(), del_docs=set(),
-             optimize=True, reload_list=False):
+             optimize=True, learn=False, reload_list=False):
         job = JobIndexUpdater(self, next(self.id_generator), self.__config,
                               docsearch, new_docs, upd_docs, del_docs,
-                              optimize)
+                              optimize, learn)
         job.connect('index-update-start',
                     lambda updater:
                     GLib.idle_add(self.__main_win.on_index_update_start_cb,
@@ -840,7 +841,8 @@ class JobImporter(Job):
             for label in self._main_win.docsearch.label_list:
                 if label in predicted_labels:
                     self._main_win.docsearch.add_label(doc, label,
-                                                       update_index=False)
+                                                       update_index=False,
+                                                       learn=False)
             self._docs_to_label_predict.remove(doc)
             if len(self._docs_to_label_predict) <= 0:
                 self._update_index()
@@ -851,7 +853,7 @@ class JobImporter(Job):
                         % len(self._docs_to_upd))
             job = self._main_win.job_factories['index_updater'].make(
                 self._main_win.docsearch, new_docs=self._docs_to_upd,
-                optimize=False, reload_list=True)
+                optimize=False, learn=False, reload_list=True)
             self._main_win.schedulers['index'].schedule(job)
             self._docs_to_upd = set()
 
@@ -1116,18 +1118,20 @@ class ActionToggleLabel(object):
             logger.info("Action: Adding label '%s' on document '%s'"
                         % (label.name, str(self.__main_win.doc)))
             self.__main_win.docsearch.add_label(self.__main_win.doc, label,
-                                                update_index=False)
+                                                update_index=False,
+                                                learn=False)
         else:
             logger.info("Action: Removing label '%s' on document '%s'"
                         % (label.name, self.__main_win.doc))
             self.__main_win.docsearch.remove_label(self.__main_win.doc, label,
-                                                   update_index=False)
+                                                   update_index=False,
+                                                   learn=False)
         self.__main_win.refresh_label_list()
         self.__main_win.refresh_docs({self.__main_win.doc},
                                      redo_thumbnails=False)
         job = self.__main_win.job_factories['index_updater'].make(
             self.__main_win.docsearch, upd_docs={self.__main_win.doc},
-            optimize=False)
+            optimize=False, learn=True)
         self.__main_win.schedulers['index'].schedule(job)
 
     def connect(self, cellrenderers):
@@ -1416,10 +1420,11 @@ class ActionDeletePage(SimpleAction):
         if doc.nb_pages <= 0:
             job = self.__main_win.job_factories['index_updater'].make(
                 self.__main_win.docsearch, del_docs={doc},
-                optimize=False)
+                optimize=False, learn=False)
         else:
             job = self.__main_win.job_factories['index_updater'].make(
-                self.__main_win.docsearch, upd_docs={doc}, optimize=False)
+                self.__main_win.docsearch, upd_docs={doc}, optimize=False,
+                learn=False)
         self.__main_win.schedulers['index'].schedule(job)
 
 
@@ -1470,7 +1475,8 @@ class ActionRedoOCR(SimpleAction):
             if self._main_win.doc in docs_done:
                 self._main_win.show_doc(self._main_win.doc, force_refresh=True)
             job = self._main_win.job_factories['index_updater'].make(
-                self._main_win.docsearch, upd_docs=docs_done, optimize=False)
+                self._main_win.docsearch, upd_docs=docs_done, optimize=False,
+                learn=False)
             self._main_win.schedulers['index'].schedule(job)
 
     def do(self, pages_iterator):
@@ -1746,7 +1752,7 @@ class ActionOptimizeIndex(SimpleAction):
     def do(self):
         SimpleAction.do(self)
         job = self.__main_win.job_factories['index_updater'].make(
-            self.__main_win.docsearch, optimize=True)
+            self.__main_win.docsearch, optimize=True, learn=False)
         self.__main_win.schedulers['index'].schedule(job)
 
 
@@ -1850,7 +1856,8 @@ class ActionRefreshIndex(SimpleAction):
             upd_docs=examiner.docs_changed,
             del_docs=examiner.docs_missing,
             reload_list=True,
-            optimize=False
+            optimize=False,
+            learn=True
         )
         self.__main_win.schedulers['index'].schedule(job)
 
@@ -2996,16 +3003,17 @@ class MainWindow(object):
                                       predicted))
             self.schedulers['main'].schedule(job)
         else:
-            self.upd_index({doc}, new=False)
+            self.upd_index({doc}, new=False, learn=False)
 
     def __on_predicted_labels(self, doc, predicted_labels):
         for label in self.docsearch.label_list:
             if label in predicted_labels:
-                self.docsearch.add_label(doc, label, update_index=False)
-        self.upd_index({doc}, new=True)
+                self.docsearch.add_label(doc, label,
+                                         update_index=False, learn=False)
+        self.upd_index({doc}, new=True, learn=False)
         self.refresh_label_list()
 
-    def upd_index(self, docs, new=False):
+    def upd_index(self, docs, new=False, learn=False):
         new_docs = set()
         upd_docs = set()
         del_docs = set()
@@ -3022,5 +3030,5 @@ class MainWindow(object):
         self.refresh_docs({doc})
         job = self.job_factories['index_updater'].make(
             self.docsearch, new_docs=new_docs, upd_docs=upd_docs,
-            del_docs=del_docs, optimize=False, reload_list=False)
+            del_docs=del_docs, optimize=False, learn=learn, reload_list=False)
         self.schedulers['index'].schedule(job)

@@ -202,7 +202,8 @@ class JobLabelCreator(Job):
         self.emit('label-creation-start')
         try:
             self.__docsearch.create_label(self.__new_label, self.__doc,
-                                          self.__progress_cb)
+                                          learn=True,
+                                          callback=self.__progress_cb)
         finally:
             self.emit('label-creation-end')
 
@@ -730,9 +731,9 @@ class DocList(object):
         self.__main_win.show_page(src_page, force_refresh=True)
         self.show_loading()
         if new_docs:
-            self.__main_win.upd_index(new_docs, new=True)
+            self.__main_win.upd_index(new_docs, new=True, learn=False)
         assert(upd_docs)
-        self.__main_win.upd_index(upd_docs, new=False)
+        self.__main_win.upd_index(upd_docs, new=False, learn=False)
 
     def get_new_doc(self):
         if self.new_doc.is_new:
@@ -1127,7 +1128,7 @@ class DocPropertiesPanel(object):
         # Date
         if self.new_doc_date is None:
             if has_changed:
-                self.__main_win.upd_index({self.doc})
+                self.__main_win.upd_index({self.doc}, learn=False)
         else:
             old_doc = self.doc.clone()
             # this case is more tricky --> del + new
