@@ -144,7 +144,6 @@ class LabelGuessUpdater(object):
         self.updated_docs.add(doc)
 
     def upd_doc(self, doc):
-        self.del_doc(doc)
         self.add_doc(doc)
 
     def del_doc(self, doc):
