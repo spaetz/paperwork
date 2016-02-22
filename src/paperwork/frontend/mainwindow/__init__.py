@@ -377,7 +377,7 @@ class JobIndexUpdater(Job):
         if self.index_updater is None:
             self.emit('index-update-start')
             self.index_updater = self.__docsearch.get_index_updater(
-                optimize=self.optimize, learn=learn)
+                optimize=self.optimize, learn=self.learn)
 
         if not self.can_run:
             self.emit('index-update-interrupted')

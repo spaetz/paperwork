@@ -214,10 +214,10 @@ class DocIndexUpdater(GObject.GObject):
                  progress_cb=dummy_progress_cb):
         self.docsearch = docsearch
         self.optimize = optimize
-        self.learn = True  # ignore the lean argument, we always learn
         self.index_writer = docsearch.index.writer()
-        if self.learn:
-            self.label_guesser_updater = docsearch.label_guesser.get_updater()
+        self.label_guesser_updater = docsearch.label_guesser.get_updater(
+            from_user=learn
+        )
         self.progress_cb = progress_cb
 
         self._upd_docs = set()
@@ -273,8 +273,7 @@ class DocIndexUpdater(GObject.GObject):
         """
         logger.info("Indexing new doc: %s" % doc)
         self._update_doc_in_index(self.index_writer, doc)
-        if self.learn:
-            self.label_guesser_updater.add_doc(doc)
+        self.label_guesser_updater.add_doc(doc)
         if doc.docid not in self.docsearch._docs_by_id:
             self.docsearch._docs_by_id[doc.docid] = doc
         self._upd_docs.add(doc)
@@ -285,8 +284,7 @@ class DocIndexUpdater(GObject.GObject):
         """
         logger.info("Updating modified doc: %s" % doc)
         self._update_doc_in_index(self.index_writer, doc)
-        if self.learn:
-            self.label_guesser_updater.upd_doc(doc)
+        self.label_guesser_updater.upd_doc(doc)
         self._upd_docs.add(doc)
 
     def del_doc(self, doc):
@@ -302,8 +300,7 @@ class DocIndexUpdater(GObject.GObject):
             self._delete_doc_from_index(self.index_writer, doc)
             return
         self._delete_doc_from_index(self.index_writer, doc.docid)
-        if self.learn:
-            self.label_guesser_updater.del_doc(doc)
+        self.label_guesser_updater.del_doc(doc)
 
     def commit(self):
         """
@@ -312,13 +309,9 @@ class DocIndexUpdater(GObject.GObject):
         logger.info("Index: Commiting changes")
         self.index_writer.commit()
         del self.index_writer
-        if self.learn:
-            self.label_guesser_updater.commit()
+        self.label_guesser_updater.commit()
 
         self.docsearch.reload_searcher()
-
-        for doc in self._upd_docs:
-            doc._previous_labels = doc.labels[:]
 
     def cancel(self):
         """
@@ -327,8 +320,7 @@ class DocIndexUpdater(GObject.GObject):
         logger.info("Index: Index update cancelled")
         self.index_writer.cancel()
         del self.index_writer
-        if self.learn:
-            self.label_guesser_updater.cancel()
+        self.label_guesser_updater.cancel()
 
 
 class DocSearch(object):

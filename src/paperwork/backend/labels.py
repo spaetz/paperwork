@@ -121,8 +121,9 @@ class Label(object):
 
 
 class LabelGuessUpdater(object):
-    def __init__(self, guesser):
+    def __init__(self, guesser, from_user):
         self.guesser = guesser
+        self.from_user = from_user
         self.updated_docs = set()
 
     def _get_doc_txt(self, doc):
@@ -153,6 +154,8 @@ class LabelGuessUpdater(object):
         for (label, guesser) in self.guesser._bayes.iteritems():
             value = "yes" if label in labels else "no"
             guesser.train(value, doc_txt)
+            if self.from_user:
+                guesser.train("user_" + value, doc_txt)
 
         self.updated_docs.add(doc)
 
@@ -174,6 +177,8 @@ class LabelGuessUpdater(object):
             guesser = self.guesser._bayes[new_label]
             guesser.untrain("no", doc_txt)
             guesser.train("yes", doc_txt)
+            if self.from_user:
+                guesser.train("user_yes", doc_txt)
 
         for old_label in old_labels:
             if old_label in new_labels:
@@ -184,6 +189,8 @@ class LabelGuessUpdater(object):
             guesser = self.guesser._bayes[old_label]
             guesser.untrain("yes", doc_txt)
             guesser.train("no", doc_txt)
+            if self.from_user:
+                guesser.train("user_no", doc_txt)
 
     def del_doc(self, doc):
         doc_txt = self._get_doc_txt(doc)
@@ -236,8 +243,8 @@ class LabelGuesser(object):
             )
             self._bayes[label_name].cache_train()
 
-    def get_updater(self):
-        return LabelGuessUpdater(self)
+    def get_updater(self, from_user=False):
+        return LabelGuessUpdater(self, from_user)
 
     def guess(self, doc):
         doc_txt = doc.text
@@ -249,8 +256,12 @@ class LabelGuesser(object):
             # we balance ourselves the scores, otherwise 'no' wins
             # too easily
             scores = guesser.score(doc_txt)
-            yes = scores['yes'] if 'yes' in scores else 0.0
-            no = scores['no'] if 'no' in scores else 0.0
+            auto_yes = scores['yes'] if 'yes' in scores else 0.0
+            auto_no = scores['no'] if 'no' in scores else 0.0
+            user_yes = scores['user_yes'] if 'user_yes' in scores else 0.0
+            user_no = scores['user_no'] if 'user_no' in scores else 0.0
+            yes = auto_yes + user_yes
+            no = auto_no + user_no
             if yes * self.WEIGHT_YES > no * self.WEIGHT_NO:
                 label_names.add(label_name)
         return label_names
