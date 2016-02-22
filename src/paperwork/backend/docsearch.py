@@ -214,11 +214,13 @@ class DocIndexUpdater(GObject.GObject):
                  progress_cb=dummy_progress_cb):
         self.docsearch = docsearch
         self.optimize = optimize
-        self.learn = learn
+        self.learn = True  # ignore the lean argument, we always learn
         self.index_writer = docsearch.index.writer()
-        if learn:
+        if self.learn:
             self.label_guesser_updater = docsearch.label_guesser.get_updater()
         self.progress_cb = progress_cb
+
+        self._upd_docs = set()
 
     def _update_doc_in_index(self, index_writer, doc):
         """
@@ -275,6 +277,7 @@ class DocIndexUpdater(GObject.GObject):
             self.label_guesser_updater.add_doc(doc)
         if doc.docid not in self.docsearch._docs_by_id:
             self.docsearch._docs_by_id[doc.docid] = doc
+        self._upd_docs.add(doc)
 
     def upd_doc(self, doc):
         """
@@ -284,6 +287,7 @@ class DocIndexUpdater(GObject.GObject):
         self._update_doc_in_index(self.index_writer, doc)
         if self.learn:
             self.label_guesser_updater.upd_doc(doc)
+        self._upd_docs.add(doc)
 
     def del_doc(self, doc):
         """
@@ -312,6 +316,9 @@ class DocIndexUpdater(GObject.GObject):
             self.label_guesser_updater.commit()
 
         self.docsearch.reload_searcher()
+
+        for doc in self._upd_docs:
+            doc._previous_labels = doc.labels[:]
 
     def cancel(self):
         """
