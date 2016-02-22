@@ -22,10 +22,9 @@ Scenario tested here:
 for each document:
     - the user scan the first page
     - labels are guessed and added
-    - user fixes the labels
     - user scans the remaining pages of the document
+    - user fixes the labels
 """
-
 
 g_correct_guess = 0
 g_missing_guess = 0
@@ -36,8 +35,8 @@ g_nb_dst_labels = 0
 g_perfect = 0
 
 
-def upd_index(dst_dsearch, doc, new, learn):
-    index_updater = dst_dsearch.get_index_updater(optimize=False, learn=learn)
+def upd_index(dst_dsearch, doc, new):
+    index_updater = dst_dsearch.get_index_updater(optimize=False)
     if new:
         index_updater.add_doc(doc)
     else:
@@ -51,7 +50,7 @@ def label_guess(dst_dsearch, src_doc, dst_doc):
 
     for label in guessed_labels:
         dst_dsearch.add_label(dst_doc, label, update_index=False)
-    upd_index(dst_dsearch, dst_doc, new=True, learn=False)
+    upd_index(dst_dsearch, dst_doc, new=True)
 
 
 def fix_labels(dst_dsearch, src_doc, dst_doc):
@@ -103,7 +102,7 @@ def fix_labels(dst_dsearch, src_doc, dst_doc):
         dst_dsearch.add_label(dst_doc, label, update_index=False)
 
     if changed:
-        upd_index(dst_dsearch, dst_doc, new=False, learn=True)
+        upd_index(dst_dsearch, dst_doc, new=False)
     else:
         g_perfect += 1
 
@@ -179,6 +178,7 @@ def main():
             files.sort()
 
             current_doc = None
+            dst_doc = None
             for filename in files:
                 if "thumb" in filename:
                     continue
@@ -205,12 +205,14 @@ def main():
                 if current_doc is None:
                     # first page --> guess labels and see if it matchs
                     label_guess(dst_dsearch, src_doc, dst_doc)
-                    fix_labels(dst_dsearch, src_doc, dst_doc)
                 else:
                     # just update the index
-                    upd_index(dst_dsearch, dst_doc, new=False, learn=False)
+                    upd_index(dst_dsearch, dst_doc, new=False)
 
                 current_doc = docs[0]
+
+            if dst_doc is not None:
+                fix_labels(dst_dsearch, src_doc, dst_doc)
 
     finally:
         rm_rf(dst_doc_dir)
