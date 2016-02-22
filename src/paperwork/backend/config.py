@@ -140,7 +140,10 @@ class PaperworkConfig(object):
                 self._configparser.write(file_descriptor)
             logger.info("Done")
         except IOError as e:
-            logger.warn("Cannot write to configuration file %s : %s" % (self.__configfile, e.strerror))
+            logger.warn(
+                "Cannot write to configuration file %s : %s"
+                % (self.__configfile, e.strerror)
+            )
             return False
 
         return True
