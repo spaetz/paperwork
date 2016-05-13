@@ -279,9 +279,7 @@ def load_config():
         _PaperworkLangs(settings['ocr_lang'], settings['spelling_lang'])
     )
 
-    for (k, v) in settings.items():
-        config.settings[k] = v
-
+    config.settings.update(settings)
     return config
 
 
